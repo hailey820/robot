@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>따뜻한 AI 로봇 설계소</title>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  
+  <!-- html2canvas (For saving image) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+  <style>
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #d6d3d1; border-radius: 10px; }
+    ::-webkit-scrollbar-thumb:hover { background: #a8a29e; }
+    
+    /* Animations */
+    .fade-in { animation: fadeIn 0.3s ease-in-out; }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body class="bg-stone-100 font-sans text-stone-800 antialiased min-h-screen flex flex-col">
+
+  <!-- Toast Notification Container -->
+  <div id="toast-container" class="fixed top-4 left-1/2 transform -translate-x-1/2 z-[100] flex flex-col gap-2 pointer-events-none"></div>
+
+  <!-- VIEW: CHAT -->
+  <div id="view-chat" class="flex-1 max-w-4xl w-full mx-auto bg-white md:my-6 md:rounded-3xl shadow-xl flex flex-col overflow-hidden border border-stone-200">
+    <!-- Header -->
+    <header class="bg-green-600 p-4 md:p-6 text-white flex items-center justify-between shadow-md z-10">
+      <div class="flex items-center gap-3">
+        <div class="bg-white p-2 rounded-full text-green-600 shadow-sm flex items-center justify-center">
+          <i data-lucide="bot" class="w-7 h-7"></i>
+        </div>
+        <div>
+          <h1 class="text-xl font-bold tracking-tight">따뜻한 AI 로봇 설계소</h1>
+          <p class="text-green-100 text-sm hidden sm:block">나만의 도우미 로봇을 만들어보아요!</p>
+        </div>
+      </div>
+      <div class="flex gap-2">
+        <span class="bg-green-700/50 px-3 py-1 rounded-full text-xs font-medium border border-green-500 flex items-center gap-1">
+          <i data-lucide="shield" class="w-3 h-3"></i> 윤리 학습
+        </span>
+      </div>
+    </header>
+
+    <!-- Chat Messages Area -->
+    <div id="chat-messages" class="flex-1 p-4 md:p-6 overflow-y-auto bg-stone-50/50 space-y-6">
+      <!-- Messages will be injected here -->
+    </div>
+
+    <!-- Typing Indicator (Hidden by default) -->
+    <div id="typing-indicator" class="hidden p-4 md:px-6 bg-stone-50/50 flex justify-start -mt-6">
+      <div class="flex gap-3 max-w-[75%]">
+        <div class="w-10 h-10 rounded-full bg-green-100 text-green-600 flex items-center justify-center flex-shrink-0">
+          <i data-lucide="bot" class="w-5 h-5"></i>
+        </div>
+        <div class="p-4 rounded-2xl bg-white border border-stone-200 text-stone-500 rounded-tl-sm flex items-center gap-2 shadow-sm">
+          <i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> 로즈가 생각하고 있어요...
+        </div>
+      </div>
+    </div>
+
+    <!-- Input Area -->
+    <div class="p-4 bg-white border-t border-stone-200">
+      <div class="flex items-end gap-2 max-w-4xl mx-auto relative">
+        <textarea id="chat-input" placeholder="여기에 답변을 입력하세요... (Shift+Enter로 줄바꿈)"
+          class="flex-1 max-h-32 min-h-[56px] p-4 bg-stone-100 border-transparent focus:bg-white focus:border-green-400 focus:ring-2 focus:ring-green-200 rounded-2xl resize-none outline-none transition-all"
+          rows="1"></textarea>
+        <button id="btn-send" class="p-4 rounded-2xl flex items-center justify-center transition-all bg-stone-200 text-stone-400 cursor-not-allowed">
+          <i data-lucide="send" class="w-6 h-6"></i>
+        </button>
+      </div>
+      <div class="text-center mt-2">
+        <p class="text-xs text-stone-400">자유롭게 생각을 이야기해보세요. 틀린 답은 없답니다!</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- VIEW: LOADING -->
+  <div id="view-loading" class="hidden flex-1 flex flex-col items-center justify-center p-4">
+    <div class="bg-white p-8 rounded-2xl shadow-xl flex flex-col items-center max-w-md w-full text-center space-y-6">
+      <div class="relative flex items-center justify-center">
+        <div class="absolute inset-0 border-4 border-green-200 border-t-green-500 rounded-full w-20 h-20 animate-spin mx-auto"></div>
+        <i data-lucide="bot" class="w-10 h-10 text-green-600 m-5"></i>
+      </div>
+      <h2 class="text-2xl font-bold text-stone-800">로봇 공장 가동 중...</h2>
+      <p id="loading-text" class="text-stone-600 animate-pulse">대화 내용을 분석하는 중입니다...</p>
+    </div>
+  </div>
+
+  <!-- VIEW: BLUEPRINT -->
+  <div id="view-blueprint" class="hidden py-8 px-4 sm:px-6 lg:px-8 flex-1 overflow-y-auto">
+    <div class="max-w-4xl mx-auto">
+      <!-- Toolbar -->
+      <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
+        <h1 class="text-3xl font-extrabold text-stone-800 flex items-center gap-3">
+          <i data-lucide="sparkles" class="w-8 h-8 text-yellow-500"></i>
+          최종 로봇 설계도
+        </h1>
+        <div class="flex gap-3 flex-wrap">
+          <button id="btn-share" class="flex items-center gap-2 text-stone-600 hover:text-indigo-600 transition-colors bg-white px-4 py-2 rounded-full shadow-sm font-medium">
+            <span id="icon-share"><i data-lucide="share-2" class="w-4 h-4"></i></span>
+            <span id="text-share">링크 공유</span>
+          </button>
+          <button id="btn-download" class="flex items-center gap-2 text-stone-600 hover:text-blue-600 transition-colors bg-white px-4 py-2 rounded-full shadow-sm font-medium">
+            <span id="icon-download"><i data-lucide="download" class="w-4 h-4"></i></span>
+            <span id="text-download">이미지로 저장</span>
+          </button>
+          <button id="btn-reset" class="flex items-center gap-2 text-stone-600 hover:text-green-600 transition-colors bg-white px-4 py-2 rounded-full shadow-sm font-medium">
+            <i data-lucide="refresh-cw" class="w-4 h-4"></i> 새 로봇 만들기
+          </button>
+        </div>
+      </div>
+
+      <!-- Blueprint Card (Target for html2canvas) -->
+      <div id="blueprint-card" class="bg-white rounded-3xl shadow-2xl overflow-hidden border border-stone-200">
+        <div class="bg-green-600 p-8 text-white relative overflow-hidden">
+          <div class="absolute top-0 right-0 opacity-10 flex items-center justify-center -mr-10 -mt-10 w-64 h-64">
+            <i data-lucide="bot" class="w-full h-full"></i>
+          </div>
+          <div class="relative z-10 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div>
+              <div class="inline-flex items-center gap-2 bg-green-500 bg-opacity-50 px-3 py-1 rounded-full text-sm font-medium mb-3">
+                <i data-lucide="heart" class="w-4 h-4 fill-current"></i> <span id="bp-target-user"></span>을(를) 위한 로봇
+              </div>
+              <h2 id="bp-robot-name" class="text-4xl font-black mb-2 tracking-tight"></h2>
+              <p id="bp-purpose" class="text-green-100 text-lg max-w-2xl"></p>
+            </div>
+          </div>
+        </div>
+
+        <div class="p-8 grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div class="flex flex-col gap-4">
+            <div class="bg-stone-50 rounded-2xl border-2 border-dashed border-stone-300 aspect-square flex items-center justify-center overflow-hidden relative shadow-inner">
+              
+              <img id="bp-robot-image" src="" alt="로봇 이미지" class="w-full h-full object-cover hidden" crossorigin="anonymous" />
+              
+              <div id="bp-robot-image-placeholder" class="text-stone-400 flex flex-col items-center gap-3">
+                <i data-lucide="image" class="w-12 h-12"></i>
+                <p>이미지를 불러올 수 없습니다.</p>
+              </div>
+
+              <div class="absolute top-4 left-4 bg-white/80 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-bold text-stone-700 flex items-center gap-1 shadow-sm">
+                <i data-lucide="image" class="w-3 h-3"></i> 시각화 모델링
+              </div>
+            </div>
+            
+            <div class="bg-amber-50 p-5 rounded-2xl border border-amber-100">
+              <h3 class="text-amber-800 font-bold mb-2 flex items-center gap-2">
+                <i data-lucide="sparkles" class="w-4 h-4"></i> 외형 특징
+              </h3>
+              <p id="bp-appearance" class="text-amber-900/80 text-sm leading-relaxed"></p>
+            </div>
+          </div>
+
+          <div class="flex flex-col gap-6">
+            <div class="bg-blue-50 p-6 rounded-2xl border border-blue-100">
+              <h3 class="text-blue-800 font-bold mb-4 flex items-center gap-2 text-lg">
+                <i data-lucide="cpu" class="w-5 h-5"></i> 핵심 기능 명세서
+              </h3>
+              <ul id="bp-core-functions" class="space-y-3"></ul>
+            </div>
+
+            <div class="bg-rose-50 p-6 rounded-2xl border border-rose-100 flex-1">
+              <h3 class="text-rose-800 font-bold mb-4 flex items-center gap-2 text-lg">
+                <i data-lucide="shield" class="w-5 h-5"></i> AI 윤리 원칙
+              </h3>
+              <p class="text-rose-600/80 text-sm mb-4">이 로봇이 세상에서 활동할 때 반드시 지켜야 할 규칙입니다.</p>
+              <ul id="bp-ethical-rules" class="space-y-4"></ul>
+            </div>
+          </div>
+        </div>
+        
+        <div class="bg-stone-50 border-t border-stone-200 p-4 text-center text-sm text-stone-500">
+          이 설계도는 따뜻한 마음을 가진 설계자와 AI 도우미의 협력으로 제작되었습니다.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SHARE MODAL -->
+  <div id="modal-share" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 fade-in">
+    <div class="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl relative">
+      <button id="btn-close-modal" class="absolute top-4 right-4 text-stone-400 hover:text-stone-600 p-1 bg-stone-100 rounded-full transition-colors">
+        <i data-lucide="x" class="w-5 h-5"></i>
+      </button>
+      
+      <div class="text-center mb-6 mt-2">
+        <div class="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mx-auto mb-3">
+          <i data-lucide="share-2" class="w-6 h-6"></i>
+        </div>
+        <h3 class="text-xl font-bold text-stone-800 mb-1">링크가 생성되었습니다! 🎉</h3>
+        <p class="text-sm text-stone-500">아래 주소를 복사하여 친구들에게 공유해보세요.</p>
+      </div>
+
+      <div class="flex gap-2 mb-2">
+        <input id="input-share-link" type="text" readonly class="flex-1 bg-stone-100/80 p-3 rounded-xl border border-stone-200 text-stone-700 text-sm outline-none focus:ring-2 focus:ring-indigo-500/20" />
+        <button id="btn-copy-link" class="px-4 py-3 rounded-xl flex items-center justify-center transition-all min-w-[90px] font-medium text-sm bg-stone-800 hover:bg-stone-900 text-white shadow-md">
+          <span id="copy-default" class="flex items-center gap-1"><i data-lucide="copy" class="w-4 h-4"></i> 복사</span>
+          <span id="copy-success" class="hidden items-center gap-1"><i data-lucide="check" class="w-4 h-4"></i> 복사됨</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Firebase Integration & App Logic -->
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
+    import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
+    import { getFirestore, doc, setDoc, getDoc } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
+
+    // --- Configuration ---
+    const apiKey = "";
+    const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+    const appId = typeof __app_id !== 'undefined' ? __app_id : 'warm-robot-app';
+    
+    let app, auth, db, currentUser;
+
+    // Firebase Init
+    try {
+      app = initializeApp(firebaseConfig);
+      auth = getAuth(app);
+      db = getFirestore(app);
+    } catch (e) {
+      console.warn("Firebase config not found or invalid. Sharing features may not work.");
+    }
+
+    // --- State Variables ---
+    let appState = 'chat'; // 'chat', 'loading', 'blueprint'
+    let isTyping = false;
+    let blueprintData = null;
+    let robotImage = null;
+    let sharedLink = null;
+    let messages = [
+      { role: 'model', text: "안녕! 나는 너만의 따뜻한 로봇 설계를 도와줄 AI 도우미 '로즈'라고 해. 🤖💚\n우리가 함께 영화 '와일드 로봇'에 나오는 것처럼 누군가를 돕는 멋진 로봇을 만들어 볼 거야.\n\n가장 먼저, **넌 어떤 사람이나 동물, 혹은 환경을 돕는 로봇을 만들고 싶어?**" }
+    ];
+
+    const CHAT_SYSTEM_PROMPT = `당신은 초등/중학생들을 위한 친절하고 따뜻한 로봇 설계 도우미 AI 선생님 '로즈(Roz)'입니다. 
+학생이 영화 '와일드 로봇'처럼 사람, 동물, 환경을 돕는 따뜻한 로봇을 설계할 수 있도록 대화를 이끌어주세요.
+
+[대화 규칙]
+1. 한 번에 너무 많은 질문을 하지 마세요. 꼭 한 번에 한 가지 주제만 질문하세요.
+2. 학생의 답변에 폭풍 칭찬을 해주고, 상상력을 자극하는 피드백을 주세요.
+3. 아이들이 이해하기 쉬운 친근한 말투(~했구나!, ~해볼까?)를 사용하세요.
+
+[진행 단계 - 이 순서대로 자연스럽게 유도하세요]
+1단계 (도입 및 목적): 어떤 대상을 어떻게 돕고 싶은지 묻기. 
+2단계 (외형과 기능): 로봇의 생김새와 특별한 기능 묻기.
+3단계 (AI 윤리 - 핵심): 로봇이 활동하며 발생할 수 있는 윤리적 문제를 하나 제시하고 해결책 묻기.
+4단계 (이름 짓기): 로봇의 멋진 이름 정하기.
+5단계 (마무리): 모든 내용이 정해지면, 학생에게 "정말 멋진 아이디어야! 이제 우리가 나눈 이야기로 설계도를 만들어볼까?" 라고 묻고, 학생이 동의하거나 "응/좋아/만들어줘"라고 대답하면 **반드시 답변의 맨 마지막에 \`[설계도 생성]\` 이라는 텍스트를 정확히 포함해서 출력하세요.**
+
+항상 학생이 스스로 생각할 수 있도록 격려해주세요!`;
+
+    // --- DOM Elements ---
+    const views = {
+      chat: document.getElementById('view-chat'),
+      loading: document.getElementById('view-loading'),
+      blueprint: document.getElementById('view-blueprint')
+    };
+    const chatMessagesEl = document.getElementById('chat-messages');
+    const chatInputEl = document.getElementById('chat-input');
+    const btnSend = document.getElementById('btn-send');
+    const typingIndicator = document.getElementById('typing-indicator');
+    const loadingTextEl = document.getElementById('loading-text');
+    const toastContainer = document.getElementById('toast-container');
+    
+    // --- Utilities ---
+    function showToast(message, type = 'info') {
+      const toast = document.createElement('div');
+      toast.className = `px-4 py-3 rounded-xl shadow-lg text-white text-sm font-medium flex items-center gap-2 fade-in transition-opacity duration-300 z-50 pointer-events-auto ${type === 'error' ? 'bg-red-500' : 'bg-stone-800'}`;
+      toast.innerHTML = `<i data-lucide="${type === 'error' ? 'alert-circle' : 'info'}" class="w-4 h-4"></i> ${message}`;
+      toastContainer.appendChild(toast);
+      lucide.createIcons({ root: toast });
+      
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        setTimeout(() => toast.remove(), 300);
+      }, 3000);
+    }
+
+    const fetchWithRetry = async (url, options, retries = 5) => {
+      const delays = [1000, 2000, 4000, 8000, 16000];
+      for (let i = 0; i < retries; i++) {
+        try {
+          const response = await fetch(url, options);
+          if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+          return await response.json();
+        } catch (error) {
+          if (i === retries - 1) throw error;
+          await new Promise(res => setTimeout(res, delays[i]));
+        }
+      }
+    };
+
+    // --- API Calls ---
+    async function generateChatResponse(history) {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+      const payload = {
+        contents: history,
+        systemInstruction: { parts: [{ text: CHAT_SYSTEM_PROMPT }] },
+      };
+      const data = await fetchWithRetry(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      return data.candidates?.[0]?.content?.parts?.[0]?.text || "오류가 발생했어요. 다시 한 번 말해줄래요?";
+    }
+
+    async function extractBlueprintJSON(chatText) {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+      const schema = {
+        type: "OBJECT",
+        properties: {
+          robotName: { type: "STRING" }, targetUser: { type: "STRING" }, purpose: { type: "STRING" }, appearance: { type: "STRING" },
+          coreFunctions: { type: "ARRAY", items: { type: "STRING" } }, ethicalRules: { type: "ARRAY", items: { type: "STRING" } }, imagePrompt: { type: "STRING" }
+        },
+        required: ["robotName", "targetUser", "purpose", "appearance", "coreFunctions", "ethicalRules", "imagePrompt"]
+      };
+      const payload = {
+        contents: [{ role: "user", parts: [{ text: `대화 기록 바탕으로 JSON 생성:\n${chatText}` }] }],
+        generationConfig: { responseMimeType: "application/json", responseSchema: schema }
+      };
+      const data = await fetchWithRetry(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      return JSON.parse(data.candidates[0].content.parts[0].text);
+    }
+
+    async function generateImage(promptText) {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${apiKey}`;
+      const enhancedPrompt = `A heartwarming, Dreamworks animation style 3D render of a friendly robot. ${promptText}, soft studio lighting, masterpiece, high quality, nature background elements.`;
+      const payload = { instances: { prompt: enhancedPrompt }, parameters: { sampleCount: 1 } };
+      const data = await fetchWithRetry(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      if (data.predictions && data.predictions[0]) return `data:image/png;base64,${data.predictions[0].bytesBase64Encoded}`;
+      throw new Error("이미지 생성 실패");
+    }
+
+    // --- Render Logic ---
+    function setAppState(state, loadText = '') {
+      appState = state;
+      Object.keys(views).forEach(k => views[k].classList.add('hidden'));
+      if (views[state]) views[state].classList.remove('hidden');
+      
+      if (state === 'loading') {
+        loadingTextEl.textContent = loadText;
+      } else if (state === 'chat') {
+        renderMessages();
+      } else if (state === 'blueprint') {
+        renderBlueprint();
+      }
+    }
+
+    function renderMessages() {
+      chatMessagesEl.innerHTML = '';
+      messages.forEach(msg => {
+        const isUser = msg.role === 'user';
+        const wrapper = document.createElement('div');
+        wrapper.className = `flex ${isUser ? 'justify-end' : 'justify-start'} fade-in`;
+        
+        const inner = document.createElement('div');
+        inner.className = `flex max-w-[85%] md:max-w-[75%] gap-3 ${isUser ? 'flex-row-reverse' : 'flex-row'}`;
+        
+        const avatar = document.createElement('div');
+        avatar.className = `w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 shadow-sm ${isUser ? 'bg-amber-100 text-amber-600' : 'bg-green-100 text-green-600'}`;
+        avatar.innerHTML = `<i data-lucide="${isUser ? 'user' : 'bot'}" class="w-5 h-5"></i>`;
+        
+        const bubble = document.createElement('div');
+        bubble.className = `p-4 rounded-2xl shadow-sm leading-relaxed whitespace-pre-wrap ${isUser ? 'bg-amber-400 text-stone-900 rounded-tr-sm' : 'bg-white border border-stone-200 text-stone-800 rounded-tl-sm'}`;
+        bubble.textContent = msg.text; // TextContent for safety
+        
+        inner.appendChild(avatar);
+        inner.appendChild(bubble);
+        wrapper.appendChild(inner);
+        chatMessagesEl.appendChild(wrapper);
+      });
+      lucide.createIcons({ root: chatMessagesEl });
+      chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
+      updateInputState();
+    }
+
+    function updateInputState() {
+      if (isTyping) {
+        typingIndicator.classList.remove('hidden');
+        btnSend.classList.replace('bg-green-500', 'bg-stone-200');
+        btnSend.classList.replace('text-white', 'text-stone-400');
+        btnSend.classList.remove('hover:bg-green-600', 'shadow-md', 'hover:shadow-lg', 'active:scale-95');
+        btnSend.classList.add('cursor-not-allowed');
+      } else {
+        typingIndicator.classList.add('hidden');
+        if (chatInputEl.value.trim()) {
+          btnSend.classList.replace('bg-stone-200', 'bg-green-500');
+          btnSend.classList.replace('text-stone-400', 'text-white');
+          btnSend.classList.add('hover:bg-green-600', 'shadow-md', 'hover:shadow-lg', 'active:scale-95');
+          btnSend.classList.remove('cursor-not-allowed');
+        } else {
+          btnSend.classList.replace('bg-green-500', 'bg-stone-200');
+          btnSend.classList.replace('text-white', 'text-stone-400');
+          btnSend.classList.remove('hover:bg-green-600', 'shadow-md', 'hover:shadow-lg', 'active:scale-95');
+          btnSend.classList.add('cursor-not-allowed');
+        }
+      }
+      chatInputEl.disabled = isTyping;
+      chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
+    }
+
+    function renderBlueprint() {
+      if (!blueprintData) return;
+      document.getElementById('bp-robot-name').textContent = blueprintData.robotName;
+      document.getElementById('bp-target-user').textContent = blueprintData.targetUser;
+      document.getElementById('bp-purpose').textContent = blueprintData.purpose;
+      document.getElementById('bp-appearance').textContent = blueprintData.appearance;
+      
+      const imgEl = document.getElementById('bp-robot-image');
+      const placeholder = document.getElementById('bp-robot-image-placeholder');
+      if (robotImage) {
+        imgEl.src = robotImage;
+        imgEl.classList.remove('hidden');
+        placeholder.classList.add('hidden');
+      } else {
+        imgEl.classList.add('hidden');
+        placeholder.classList.remove('hidden');
+      }
+
+      const funcsEl = document.getElementById('bp-core-functions');
+      funcsEl.innerHTML = blueprintData.coreFunctions.map((func, i) => `
+        <li class="flex items-start gap-3 text-blue-900/80">
+          <div class="bg-blue-200 text-blue-700 rounded-full w-6 h-6 flex items-center justify-center flex-shrink-0 text-sm font-bold mt-0.5">${i + 1}</div>
+          <span class="leading-relaxed">${func}</span>
+        </li>
+      `).join('');
+
+      const ethicsEl = document.getElementById('bp-ethical-rules');
+      ethicsEl.innerHTML = blueprintData.ethicalRules.map(rule => `
+        <li class="flex gap-3 text-rose-900/90 bg-white p-3 rounded-xl shadow-sm border border-rose-50">
+          <i data-lucide="leaf" class="text-rose-400 flex-shrink-0 mt-0.5 w-4 h-4"></i>
+          <span class="text-sm font-medium leading-relaxed">${rule}</span>
+        </li>
+      `).join('');
+
+      lucide.createIcons({ root: views.blueprint });
+    }
+
+    // --- Actions ---
+    async function handleSend() {
+      const text = chatInputEl.value.trim();
+      if (!text || isTyping) return;
+
+      chatInputEl.value = '';
+      messages.push({ role: 'user', text });
+      isTyping = true;
+      renderMessages();
+
+      try {
+        const apiHistory = messages.map(msg => ({ role: msg.role, parts: [{ text: msg.text }] }));
+        const responseText = await generateChatResponse(apiHistory);
+        
+        if (responseText.includes('[설계도 생성]')) {
+          const cleanResponse = responseText.replace(/\[설계도 생성\]/g, '').trim();
+          if (cleanResponse) messages.push({ role: 'model', text: cleanResponse });
+          startBlueprintGeneration();
+        } else {
+          messages.push({ role: 'model', text: responseText });
+          isTyping = false;
+          renderMessages();
+        }
+      } catch (error) {
+        console.error(error);
+        messages.push({ role: 'model', text: "앗, 통신에 문제가 생겼어. 다시 한 번 말해줄 수 있을까? 😢" });
+        isTyping = false;
+        renderMessages();
+      }
+    }
+
+    async function startBlueprintGeneration() {
+      setAppState('loading', '대화 내용을 분석하여 설계도를 그리는 중입니다...');
+      try {
+        const fullChatText = messages.map(m => `${m.role === 'user' ? '학생' : 'AI'}: ${m.text}`).join('\n');
+        blueprintData = await extractBlueprintJSON(fullChatText);
+
+        setAppState('loading', '로봇의 모습을 상상하여 이미지를 스케치하는 중입니다...');
+        try {
+          robotImage = await generateImage(blueprintData.imagePrompt);
+        } catch (imgError) {
+          console.error("Image gen failed:", imgError);
+        }
+        setAppState('blueprint');
+      } catch (error) {
+        console.error(error);
+        showToast("설계도를 생성하는 중 오류가 발생했습니다.", "error");
+        setAppState('chat');
+      }
+    }
+
+    async function handleDownload() {
+      const btnIcon = document.getElementById('icon-download');
+      const btnText = document.getElementById('text-download');
+      const originalIcon = btnIcon.innerHTML;
+      btnIcon.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i>`;
+      btnText.textContent = "저장 중...";
+      lucide.createIcons({ root: btnIcon });
+
+      try {
+        const canvas = await window.html2canvas(document.getElementById('blueprint-card'), {
+          useCORS: true, scale: 2, backgroundColor: '#ffffff'
+        });
+        const link = document.createElement('a');
+        link.download = `${blueprintData?.robotName || '따뜻한로봇_설계도'}.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+      } catch (error) {
+        console.error(error);
+        showToast("이미지 다운로드 중 오류가 발생했습니다.", "error");
+      } finally {
+        btnIcon.innerHTML = originalIcon;
+        btnText.textContent = "이미지로 저장";
+        lucide.createIcons({ root: btnIcon });
+      }
+    }
+
+    async function handleShare() {
+      if (!currentUser || !blueprintData) {
+        showToast("데이터 연동 중입니다. 잠시 후 시도해주세요.", "error");
+        return;
+      }
+      
+      const btnIcon = document.getElementById('icon-share');
+      const btnText = document.getElementById('text-share');
+      const originalIcon = btnIcon.innerHTML;
+      btnIcon.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i>`;
+      btnText.textContent = "생성 중...";
+      lucide.createIcons({ root: btnIcon });
+
+      try {
+        const shareId = crypto.randomUUID();
+        const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'blueprints', shareId);
+        
+        try {
+          await setDoc(docRef, { blueprintData, robotImage, createdAt: new Date().toISOString(), creatorId: currentUser.uid });
+        } catch (e) {
+          await setDoc(docRef, { blueprintData, createdAt: new Date().toISOString(), creatorId: currentUser.uid });
+        }
+
+        sharedLink = `${window.location.origin}${window.location.pathname}?id=${shareId}`;
+        document.getElementById('input-share-link').value = sharedLink;
+        document.getElementById('modal-share').classList.remove('hidden');
+        resetCopyButton();
+      } catch (error) {
+        console.error(error);
+        showToast("링크 생성 중 오류가 발생했습니다.", "error");
+      } finally {
+        btnIcon.innerHTML = originalIcon;
+        btnText.textContent = "링크 공유";
+        lucide.createIcons({ root: btnIcon });
+      }
+    }
+
+    function copyToClipboard() {
+      const copyDefault = document.getElementById('copy-default');
+      const copySuccess = document.getElementById('copy-success');
+      
+      const doCopy = () => {
+        copyDefault.classList.add('hidden');
+        copySuccess.classList.remove('hidden');
+        copySuccess.classList.add('flex');
+        document.getElementById('btn-copy-link').classList.replace('bg-stone-800', 'bg-green-500');
+        setTimeout(resetCopyButton, 2000);
+      };
+
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(sharedLink).then(doCopy).catch(fallbackCopy);
+      } else {
+        fallbackCopy();
+      }
+
+      function fallbackCopy() {
+        const textArea = document.createElement("textarea");
+        textArea.value = sharedLink;
+        document.body.appendChild(textArea);
+        textArea.select();
+        try { document.execCommand('copy'); doCopy(); } catch (err) { console.error('Fallback copy failed', err); }
+        document.body.removeChild(textArea);
+      }
+    }
+
+    function resetCopyButton() {
+      document.getElementById('copy-default').classList.remove('hidden');
+      document.getElementById('copy-default').classList.add('flex');
+      document.getElementById('copy-success').classList.add('hidden');
+      document.getElementById('copy-success').classList.remove('flex');
+      document.getElementById('btn-copy-link').classList.replace('bg-green-500', 'bg-stone-800');
+    }
+
+    function resetApp() {
+      if (window.history.pushState) {
+        const newurl = window.location.protocol + "//" + window.location.host + window.location.pathname;
+        window.history.pushState({path:newurl}, '', newurl);
+      }
+      messages = [{ role: 'model', text: "다시 만나서 반가워! 새로운 로봇을 설계해 볼까? 이번엔 누군가를 돕는 로봇을 만들어볼까?" }];
+      blueprintData = null;
+      robotImage = null;
+      isTyping = false;
+      setAppState('chat');
+    }
+
+    // --- Init & Listeners ---
+    document.addEventListener('DOMContentLoaded', () => {
+      lucide.createIcons();
+      renderMessages();
+
+      // Auth & Data Load
+      if (auth) {
+        const initAuth = async () => {
+          try {
+            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) await signInWithCustomToken(auth, __initial_auth_token);
+            else await signInAnonymously(auth);
+          } catch (e) { console.error("Auth Init Error", e); }
+        };
+        initAuth();
+
+        onAuthStateChanged(auth, async (user) => {
+          currentUser = user;
+          if (!user) return;
+          
+          const urlParams = new URLSearchParams(window.location.search);
+          const sharedId = urlParams.get('id');
+          if (sharedId && appState === 'chat' && messages.length === 1) {
+            setAppState('loading', '친구의 로봇 설계도를 불러오는 중입니다...');
+            try {
+              const docSnap = await getDoc(doc(db, 'artifacts', appId, 'public', 'data', 'blueprints', sharedId));
+              if (docSnap.exists()) {
+                const data = docSnap.data();
+                blueprintData = data.blueprintData;
+                if (data.robotImage) {
+                  robotImage = data.robotImage;
+                  setAppState('blueprint');
+                } else {
+                  setAppState('loading', '로봇의 모습을 새로 스케치하는 중입니다...');
+                  robotImage = await generateImage(data.blueprintData.imagePrompt).catch(() => null);
+                  setAppState('blueprint');
+                }
+              } else {
+                showToast("설계도를 찾을 수 없어요. 주소를 확인해주세요!", "error");
+                setAppState('chat');
+              }
+            } catch (err) {
+              console.error(err);
+              showToast("불러오는 중 문제가 발생했습니다.", "error");
+              setAppState('chat');
+            }
+          }
+        });
+      }
+
+      // Events
+      btnSend.addEventListener('click', handleSend);
+      chatInputEl.addEventListener('input', updateInputState);
+      chatInputEl.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
+      });
+
+      document.getElementById('btn-download').addEventListener('click', handleDownload);
+      document.getElementById('btn-share').addEventListener('click', handleShare);
+      document.getElementById('btn-reset').addEventListener('click', resetApp);
+      document.getElementById('btn-close-modal').addEventListener('click', () => document.getElementById('modal-share').classList.add('hidden'));
+      document.getElementById('btn-copy-link').addEventListener('click', copyToClipboard);
+    });
+  </script>
+</body>
+</html>
